@@ -10,10 +10,6 @@ import numpy as np
 
 app = Flask(__name__)
 
-@app.route('/')
-def index():
-    return "Hello, World!"
-
 @app.route('/styleeq/api/v1.0/getpivots', methods=['POST'])
 def getpivots():
     sources = request.json["sources"]
@@ -95,30 +91,6 @@ def fromfeatures():
 
     return jsonify({"outputs": [{"source": src, "transfer": outputs[i]}    
                                 for src, i in zip(sources, I)]}), 201
-
-@app.route('/styleeq/api/v1.0/transfer', methods=['GET'])
-def get_tasks():
-    return jsonify({"the answer to life, the universe, ...": 42})
-
-@app.route('/styleeq/api/v1.0/generate', methods=['POST'])
-def generate():
-    src = request.json["source"]
-    features = request.json["features"]
-    bs = max(request.json.get("beam_size", 8), 16)
-
-    batch = [[features],] 
-    batch = app.PLUM["batcher"]._collate_fn(batch)
-
-    print(batch)
-    print(features.keys())
-
-    encoder_state, controls_state = app.PLUM["model"].encode(batch)
-    search = BeamSearch(beam_size=bs, max_steps=100, 
-                        vocab=app.PLUM["decoder_vocab"])
-    search(app.PLUM['model'].decoder, encoder_state, controls=controls_state)
-    outputs = [" ".join(output) for output in search.output()]
-    
-    return jsonify({"features": features, "source": src, "generated": outputs}), 201
 
 
 if __name__ == '__main__':
