@@ -3,12 +3,15 @@ from flask import Flask, jsonify, request
 import argparse
 from pathlib import Path
 import json
-from styleeq_utils import load_model, load_batcher, get_features, get_pivots
+from styleeq_utils import (
+    load_model, load_batcher, get_features, get_pivots, replace_prop_names)
 from plum.seq2seq.search import BeamSearch
 import numpy as np
+from flask_cors import CORS
 
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route('/styleeq/api/v1.0/getpivots', methods=['POST'])
 def getpivots():
@@ -49,6 +52,7 @@ def frompivots():
                 ]
             )
         batch = app.PLUM["batcher"]._collate_fn(batch)
+        pnames = features["sequence"].get("proper nouns", None)
 
         encoder_state, controls_state = app.PLUM["model"].encode(batch)
         search = BeamSearch(beam_size=8, max_steps=100, 
@@ -60,8 +64,13 @@ def frompivots():
         all_outputs.append(
             {
                 "source": source, 
-                "transfers": [{"pivot": p["original"], "transfer": o}
-                              for p, o in zip(pivots, outputs)]
+                "transfers": [
+                    {
+                        "pivot": p["original"], 
+                        "transfer": replace_prop_names(o, pnames),
+                    }
+                    for p, o in zip(pivots, outputs)
+                ]
             }
         )
 
@@ -87,10 +96,17 @@ def fromfeatures():
                         vocab=app.PLUM["decoder_vocab"])
     search(app.PLUM['model'].decoder, encoder_state, 
            controls=controls_state)
-    outputs = [" ".join(output) for output in search.output()]
+    outputs = search.output()
+    outputs = [outputs[i] for i in I]
+    outputs = [
+        replace_prop_names(
+            " ".join(output), 
+            feature["sequence"].get("proper nouns", None))
+        for output, feature in zip(outputs, features)
+    ]
 
-    return jsonify({"outputs": [{"source": src, "transfer": outputs[i]}    
-                                for src, i in zip(sources, I)]}), 201
+    return jsonify({"outputs": [{"source": src, "transfer": o}    
+                                for src, o in zip(sources, outputs)]}), 201
 
 
 if __name__ == '__main__':

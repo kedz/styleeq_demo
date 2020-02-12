@@ -2,6 +2,7 @@ import json
 import plum
 from collections import defaultdict
 import random
+import re
 
 from get_style_json import create_json
 
@@ -188,3 +189,14 @@ def get_pivots(features, db, genre, opts=8):
         random.shuffle(options)
         pivots.append(options[:opts])
     return pivots
+
+def replace_prop_names(output_str, propn_list=None):
+    if propn_list is None:
+        propn_list = []
+    else: 
+        propn_list = list(propn_list)
+
+    while propn_list and "PROPN" in output_str:
+        output_str = re.sub('PROPN', propn_list.pop(0), output_str, 1)
+    return output_str
+
